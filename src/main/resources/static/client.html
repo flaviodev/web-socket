@@ -1,83 +1,119 @@
-<html>
-    <head>
-        <title>Chat WebSocket</title>
-        <script src="./js/sockjs.min.js"></script>
-        <script src="./js/stomp.min.js"></script>
-        <script type="text/javascript">
-            var stompClient = null;
-             
-            function setConnected(connected) {
-                document.getElementById('connect').disabled = connected;
-                document.getElementById('disconnect').disabled = !connected;
-                document.getElementById('conversationDiv').style.visibility 
-                  = connected ? 'visible' : 'hidden';
-                document.getElementById('response').innerHTML = '';
-            }
-             
-            function connect() {
-                var socket = new SockJS('/order');
-                stompClient = Stomp.over(socket);  
-                stompClient.connect({}, function(frame) {
-                    setConnected(true);
-                    console.log('Connected: ' + frame);
-                    stompClient.subscribe('/topic/orders', function(orderOutput) {
-                        showMessageOutput(JSON.parse(orderOutput.body));
-                    });
-                });
-            }
-             
-            function disconnect() {
-                if(stompClient != null) {
-                    stompClient.disconnect();
-                }
-                setConnected(false);
-                console.log("Disconnected");
-            }
-             
-            function sendMessage() {
-            	var number = document.getElementById('number').value;
-            	var salor = document.getElementById('salor').value;
-                var costumer = document.getElementById('costumer').value;
-                var totalAmount = document.getElementById('totalAmount').value;
-                stompClient.send("/app/order", {}, 
-                  JSON.stringify({'number':number,'salor':salor, 'costumer':costumer, "totalAmount":totalAmount}));
-            }
-             
-            function showMessageOutput(orderOutput) {
-                var response = document.getElementById('response');
-                var p = document.createElement('p');
-                p.style.wordWrap = 'break-word';
-                p.appendChild(document.createTextNode(orderOutput.number + " - "
-                		+ orderOutput.salor + " - " 
-                		+ orderOutput.costumer + " - "
-                		+ orderOutput.totalAmount 
-                		+ " (" + orderOutput.dateTime + ")"
-                		+ " [" + orderOutput.status + "]"));
-                response.appendChild(p);
-            }
-        </script>
-    </head>
-    <body onload="disconnect()">
-        <div>
-            <div>
-                <input type="text" id="salor" placeholder="Salor name"/>
-            </div>
-            <br />
-            <div>
-                <button id="connect" onclick="connect();">Connect</button>
-                <button id="disconnect" disabled="disabled" onclick="disconnect();">
-                    Disconnect
-                </button>
-            </div>
-            <br />
-            <div id="conversationDiv">
-                <input type="number" id="number" placeholder="Order number"/>
-                <input type="text" id="costumer" placeholder="Costumer name"/>
-                <input type="number" id="totalAmount" placeholder="Order total amount"/>
-                <button id="sendMessage" onclick="sendMessage();">Send</button>
-                <p id="response"></p>
-            </div>
-        </div>
- 
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>Cashier</title>
+    <link href="./css/bootstrap.min.css" rel="stylesheet">
+    <script src="./js/sockjs.min.js"></script>
+    <script src="./js/stomp.min.js"></script>
+
+    <script type="text/javascript">
+         var stompClient = null;
+          
+         function setConnected(connected) {
+             document.getElementById('connect').disabled = connected;
+             document.getElementById('disconnect').disabled = !connected;
+         }
+          
+         function connect() {
+             var socket = new SockJS('/order');
+             stompClient = Stomp.over(socket);  
+             stompClient.connect({}, function(frame) {
+                 setConnected(true);
+                 console.log('Connected: ' + frame);
+                 stompClient.subscribe('/topic/orders', function(orderOutput) {
+                     showMessageOutput(JSON.parse(orderOutput.body));
+                 });
+             });
+         }
+          
+         function disconnect() {
+             if(stompClient != null) {
+                 stompClient.disconnect();
+             }
+             setConnected(false);
+             console.log("Disconnected");
+         }
+          
+         function sendMessage(number, costumer, totalAmount, salor) {
+            stompClient.send("/app/order", {}, 
+               JSON.stringify({'number':number,'salor':salor, 'costumer':costumer, "totalAmount":totalAmount}));
+         }
+                   
+         function showMessageOutput(orderOutput) {
+        	 
+        	 if(orderOutput.status == 'SENT') {
+        	 
+	             var table = document.getElementById('orders').getElementsByTagName('tbody')[0];
+	          	 var newRow = table.insertRow(table.rows.length);
+	             
+	          	 var numberCell = newRow.insertCell(0);
+	             var numberText  = document.createTextNode(orderOutput.number);
+	             numberCell.appendChild(numberText);             
+	             
+	          	 var costumerCell = newRow.insertCell(1);
+	             var costumerText  = document.createTextNode(orderOutput.costumer);
+	             costumerCell.appendChild(costumerText);
+	             
+	          	 var totalAmountCell = newRow.insertCell(2);
+	             var totalAmountText  = document.createTextNode(orderOutput.totalAmount);
+	             totalAmountCell.appendChild(totalAmountText);
+	             
+	          	 var salorCell = newRow.insertCell(3);
+	             var salorText  = document.createTextNode(orderOutput.salor);
+	             salorCell.appendChild(salorText);
+	          	 
+	             var actionsCell = newRow.insertCell(4);
+	          	 var confirmButton = document.createElement("button");
+	             var confirmText  = document.createTextNode("Confirm");
+	             confirmButton.appendChild(confirmText);
+	             confirmButton.onclick = function() { 
+	            	 var xhr = new XMLHttpRequest();
+	            	 xhr.open("POST", "http://localhost:8080/order/confirm/"+orderOutput.number, true);
+	            	 xhr.setRequestHeader('Content-Type', 'application/json');
+	            	 xhr.send();
+				 };
+	             confirmButton.className = "btn btn-success";
+	             
+	          	 actionsCell.appendChild(confirmButton);         
+
+        	 } else {
+        		 var table = document.getElementById('orders').getElementsByTagName('tbody')[0];
+        		 
+        		 for (var i = 0, row; row = table.rows[i]; i++) {
+        			 if(row.cells[0].innerHTML == orderOutput.number) {
+        				 table.deleteRow(i);
+        				 break;
+        			 }
+        		 }
+        	 }             
+         }
+     </script>
+ </head>
+ <body onload="disconnect()">
+         <br />
+         <div>
+             <button class="btn btn-primary" id="connect" onclick="connect();">Open Cashier</button>
+             <button class="btn btn-secondary" id="disconnect" disabled="disabled" onclick="disconnect();">
+                 Close
+             </button>
+         </div>
+         <br />
+            
+        <table id="orders" class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Number</th>
+                    <th>Costumer</th>
+                    <th>Total Amount</th>
+                    <th>Salor</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            
+            <tbody>
+            </tbody>
+        </table>
+        
     </body>
 </html>
